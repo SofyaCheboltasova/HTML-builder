@@ -1,10 +1,12 @@
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
-const projectDistPath = path.join(__dirname, 'project-dist');
-const templateFilePath = path.join(projectDistPath, 'index.html');
-const stylesFilePath = path.join(projectDistPath, 'styles.css');
+const projectDirPath = path.join(__dirname, 'project-dist');
+const projectAssetsDirPath = path.join(projectDirPath, 'assets');
+const templateFilePath = path.join(projectDirPath, 'index.html');
+const stylesFilePath = path.join(projectDirPath, 'styles.css');
 const stylesDirPath = path.join(__dirname, 'styles');
+const assetsDirPath = path.join(__dirname, 'assets');
 
 async function cleanUpFiles() {
   await Promise.allSettled([
@@ -19,13 +21,16 @@ async function cleanUpFiles() {
   });
 }
 
-function createDir() {
-  fs.mkdir(path.join(__dirname, 'project-dist'), { recursive: true }, () => {});
-  console.log('project-dist directory updated\n');
+function createDir(sourceDir, name) {
+  const dirPath = path.join(sourceDir, name);
+  fs.mkdir(dirPath, { recursive: true }, () => {});
+  console.log(`${name} directory created\n`);
+
+  return dirPath;
 }
 
-async function readStyleDirectory() {
-  return await fsPromises.readdir(stylesDirPath, {
+async function readDirectory(path) {
+  return await fsPromises.readdir(path, {
     withFileTypes: true,
   });
 }
@@ -49,13 +54,41 @@ function fillBundleFile(file) {
   console.log(`File ${file.name} merged to bundle.css\n`);
 }
 
-async function mergeStyles() {
-  await readStyleDirectory().then((files) => {
+function mergeStyles() {
+  readDirectory(stylesDirPath).then((files) => {
     for (let file of files) {
       if (!isCssFile(file)) continue;
       fillBundleFile(file);
     }
   });
+}
+
+function copyFileContent(destinationPath, file) {
+  const input = fs.createReadStream(path.join(file.path, file.name), 'utf-8');
+  const output = fs.createWriteStream(
+    path.join(destinationPath, file.name),
+    'utf-8',
+  );
+
+  input.pipe(output);
+}
+
+function copyDir(sourcePath, destinationPath) {
+  readDirectory(sourcePath)
+    .then((files) => {
+      for (const file of files) {
+        if (file.isDirectory()) {
+          const newSourcePath = path.join(file.path, file.name);
+          const newDestPath = createDir(destinationPath, file.name);
+          copyDir(newSourcePath, newDestPath);
+        } else {
+          copyFileContent(destinationPath, file);
+        }
+      }
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 }
 
 cleanUpFiles()
@@ -68,6 +101,8 @@ cleanUpFiles()
     }
   })
   .finally(() => {
-    createDir();
+    createDir(__dirname, 'project-dist');
+    createDir(projectDirPath, 'assets');
+    copyDir(assetsDirPath, projectAssetsDirPath);
     mergeStyles();
   });
