@@ -7,6 +7,7 @@ const projectHtmlFilePath = path.join(projectDirPath, 'index.html');
 const stylesDirPath = path.join(__dirname, 'styles');
 const componentsDirPath = path.join(__dirname, 'components');
 const assetsDirPath = path.join(__dirname, 'assets');
+const templateFilePath = path.join(__dirname, 'template.html');
 
 async function getAllFiles(source) {
   const subDirs = await readDirectory(source);
@@ -99,59 +100,61 @@ async function copyDir(source, dest) {
   }
 }
 
-function replaceTags() {
-  readDirectory(componentsDirPath).then((files) => {
-    const input = fs.createReadStream(
-      path.join(__dirname, 'template.html'),
-      'utf-8',
-    );
+function setTagData(fname) {
+  const tagName = fname.replace('.html', '');
+  const tagStream = fs.createReadStream(
+    path.join(componentsDirPath, fname),
+    'utf-8',
+  );
+  return { name: tagName, stream: tagStream, content: '' };
+}
 
-    const output = fs.createWriteStream(projectHtmlFilePath, 'utf-8');
-    let outputContent = '';
+function readTagContent(tag) {
+  tag.stream.on('data', (chunk) => {
+    tag.content += chunk.toString();
+  });
+}
 
-    const tagsForChange = [];
-    for (const file of files) {
-      if (hasExt(file, 'html')) {
-        const tagName = file.name.replace('.html', '');
-        const tagStream = fs.createReadStream(
-          path.join(componentsDirPath, file.name),
-          'utf-8',
-        );
-        tagsForChange.push({ name: tagName, stream: tagStream, content: '' });
-      }
+function replaceTags(chunk, tagsForChange) {
+  let newContent = '';
+  for (const tag of tagsForChange) {
+    if (chunk.includes(tag.name)) {
+      newContent = chunk.replace(`{{${tag.name}}}`, tag.content);
+      chunk = newContent;
     }
+    console.log(`Replaced {{${tag.name}}}\n`);
+  }
+  return chunk;
+}
 
-    for (const tag of tagsForChange) {
-      tag.stream.on('data', (chunk) => {
-        tag.content += chunk.toString();
-      });
+async function handleHtmlFile() {
+  const input = fs.createReadStream(templateFilePath, 'utf-8');
+  const output = fs.createWriteStream(projectHtmlFilePath, 'utf-8');
+  const tagsForChange = [];
 
-      tag.stream.on('end', () => {
-        console.log(`Read ${tag.name}.html\n`);
-      });
+  const files = await readDirectory(componentsDirPath);
+  for (const file of files) {
+    if (hasExt(file, 'html')) {
+      const tagData = setTagData(file.name);
+      tagsForChange.push(tagData);
     }
-    const lastTag = tagsForChange[tagsForChange.length - 1];
-    lastTag.stream.on('end', () => {
-      input.on('data', (chunk) => {
-        let data = chunk.toString();
-        let newContent = '';
+  }
 
-        for (const tag of tagsForChange) {
-          if (data.includes(tag.name)) {
-            newContent = data.replace(`{{${tag.name}}}`, tag.content);
-            data = newContent;
-          }
-          console.log(`Replaced {{${tag.name}}}\n`);
-        }
-        outputContent += newContent;
-      });
+  for (const tag of tagsForChange) {
+    readTagContent(tag);
+  }
 
-      input.on('end', () => {
-        output.write(outputContent);
-      });
-      input.on('end', () => {
-        console.log('index.html filled\n');
-      });
+  const lastTag = tagsForChange[tagsForChange.length - 1];
+  lastTag.stream.on('end', () => {
+    let resultContent = '';
+
+    input.on('data', (chunk) => {
+      resultContent += replaceTags(chunk.toString(), tagsForChange);
+    });
+
+    input.on('end', () => {
+      output.write(resultContent);
+      console.log('index.html filled\n');
     });
   });
 }
@@ -162,6 +165,6 @@ cleanUpFiles(projectDirPath)
     createDir(projectDirPath, 'assets');
     copyDir(assetsDirPath, projectAssetsDirPath);
     mergeStyles(stylesDirPath, projectDirPath);
-    replaceTags();
+    handleHtmlFile();
   })
   .catch(() => console.log('Nothing to clean\n'));
