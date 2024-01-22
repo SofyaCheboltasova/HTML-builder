@@ -8,8 +8,8 @@ function createDir() {
   fs.mkdir(path.join(__dirname, 'files-copy'), { recursive: true }, () => {});
 }
 
-async function readDirectory() {
-  return await fsPromises.readdir(sourcePath, {
+function readDir() {
+  return fsPromises.readdir(sourcePath, {
     withFileTypes: true,
   });
 }
@@ -22,12 +22,11 @@ function copyFileContent(file) {
   console.log(`File ${file.name} copied to files-copy\n`);
 }
 
-function copyDir() {
-  readDirectory().then((files) => {
-    for (const file of files) {
-      copyFileContent(file);
-    }
-  });
+async function copyDir() {
+  const files = await readDir();
+  for (const file of files) {
+    copyFileContent(file);
+  }
 }
 
 createDir();
