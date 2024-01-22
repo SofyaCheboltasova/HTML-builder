@@ -12,7 +12,7 @@ const assetsDirPath = path.join(__dirname, 'assets');
 async function getAllFiles(source) {
   const subDirs = await readDirectory(source);
   const files = await Promise.all(
-    subDirs.map((subDir) => {
+    subDirs.map(async (subDir) => {
       const elemPath = path.join(source, subDir.name);
       return subDir.isDirectory() ? getAllFiles(elemPath) : elemPath;
     }),
@@ -32,9 +32,9 @@ async function cleanUpFiles(source) {
 
 function createDir(sourceDir, name) {
   const dirPath = path.join(sourceDir, name);
-  fs.mkdir(dirPath, { recursive: true }, () => {});
-  console.log(`${name} directory created\n`);
-
+  fs.mkdir(dirPath, { recursive: true }, () => {
+    console.log(`${name} directory created\n`);
+  });
   return dirPath;
 }
 
@@ -158,10 +158,12 @@ function replaceTags() {
   });
 }
 
-cleanUpFiles(projectDirPath).then(() => {
-  createDir(__dirname, 'project-dist');
-  createDir(projectDirPath, 'assets');
-  copyDir(assetsDirPath, projectAssetsDirPath);
-  mergeStyles(stylesDirPath, stylesFilePath);
-  replaceTags();
-});
+cleanUpFiles(projectDirPath)
+  .finally(() => {
+    createDir(__dirname, 'project-dist');
+    createDir(projectDirPath, 'assets');
+    copyDir(assetsDirPath, projectAssetsDirPath);
+    mergeStyles(stylesDirPath, stylesFilePath);
+    replaceTags();
+  })
+  .catch(() => console.log('Nothing to clean\n'));
