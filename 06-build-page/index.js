@@ -65,11 +65,15 @@ function mergeStyles() {
 }
 
 function copyFileContent(destinationPath, file) {
-  const input = fs.createReadStream(path.join(file.path, file.name), 'utf-8');
-  const output = fs.createWriteStream(
-    path.join(destinationPath, file.name),
-    'utf-8',
-  );
+  const ext = path.extname(file.name).slice(1);
+  const encoding = ext === 'jpg' ? null : 'utf-8';
+
+  const input = fs.createReadStream(path.join(file.path, file.name), {
+    encoding: encoding,
+  });
+  const output = fs.createWriteStream(path.join(destinationPath, file.name), {
+    encoding: encoding,
+  });
 
   input.pipe(output);
 }
