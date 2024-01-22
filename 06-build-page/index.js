@@ -81,23 +81,22 @@ async function mergeStyles(source, dest) {
   }
 }
 
-function copyDir(source, dest) {
-  readDirectory(source)
-    .then((files) => {
-      for (const file of files) {
-        if (file.isDirectory()) {
-          const newSourcePath = path.join(file.path, file.name);
-          const newDestPath = createDir(dest, file.name);
-          copyDir(newSourcePath, newDestPath);
-        } else {
-          const paths = getPathsObject(source, dest, file.name, file.name);
-          writeFile(paths);
-        }
-      }
-    })
-    .catch((err) => {
-      console.log(err);
-    });
+async function copyDir(source, dest) {
+  const files = await readDirectory(source);
+
+  for (const file of files) {
+    const fname = file.name;
+    const fpath = file.path;
+
+    if (file.isDirectory()) {
+      const newSourcePath = path.join(fpath, fname);
+      const newDestPath = createDir(dest, fname);
+      copyDir(newSourcePath, newDestPath);
+    } else {
+      const paths = getPathsObject(source, dest, fname, fname);
+      writeFile(paths);
+    }
+  }
 }
 
 function replaceTags() {
