@@ -7,7 +7,6 @@ const output = fs.createWriteStream(pathToFile);
 function exitProgram(signal) {
   stdout.write(`The program was stopped with signal ${signal}`);
   output.end();
-  process.exit(signal);
 }
 
 process.on('exit', (signal) => exitProgram(signal));
