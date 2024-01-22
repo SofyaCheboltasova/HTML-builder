@@ -3,15 +3,16 @@ const fsPromises = require('fs').promises;
 const path = require('path');
 const projectDirPath = path.join(__dirname, 'project-dist');
 const projectAssetsDirPath = path.join(projectDirPath, 'assets');
-const templateFilePath = path.join(projectDirPath, 'index.html');
-const stylesFilePath = path.join(projectDirPath, 'styles.css');
+const projectHtmlFilePath = path.join(projectDirPath, 'index.html');
+const stylesFilePath = path.join(projectDirPath, 'style.css');
 const stylesDirPath = path.join(__dirname, 'styles');
+const componentsDirPath = path.join(__dirname, 'components');
 const assetsDirPath = path.join(__dirname, 'assets');
 
 async function cleanUpFiles() {
   await Promise.allSettled([
     fsPromises
-      .truncate(templateFilePath)
+      .truncate(projectHtmlFilePath)
       .then(() => console.log('index.html cleaned up\n')),
     fsPromises
       .truncate(stylesFilePath)
@@ -35,9 +36,9 @@ async function readDirectory(path) {
   });
 }
 
-function isCssFile(file) {
-  const ext = path.extname(file.name).slice(1);
-  return ext === 'css';
+function hasExt(file, ext) {
+  const fileExt = path.extname(file.name).slice(1);
+  return ext === fileExt;
 }
 
 function fillBundleFile(file) {
@@ -57,7 +58,7 @@ function fillBundleFile(file) {
 function mergeStyles() {
   readDirectory(stylesDirPath).then((files) => {
     for (let file of files) {
-      if (!isCssFile(file)) continue;
+      if (!hasExt(file, 'css')) continue;
       fillBundleFile(file);
     }
   });
@@ -91,6 +92,63 @@ function copyDir(sourcePath, destinationPath) {
     });
 }
 
+function replaceTags() {
+  readDirectory(componentsDirPath).then((files) => {
+    const input = fs.createReadStream(
+      path.join(__dirname, 'template.html'),
+      'utf-8',
+    );
+
+    const output = fs.createWriteStream(projectHtmlFilePath, 'utf-8');
+    let outputContent = '';
+
+    const tagsForChange = [];
+    for (const file of files) {
+      if (hasExt(file, 'html')) {
+        const tagName = file.name.replace('.html', '');
+        const tagStream = fs.createReadStream(
+          path.join(componentsDirPath, file.name),
+          'utf-8',
+        );
+        tagsForChange.push({ name: tagName, stream: tagStream, content: '' });
+      }
+    }
+
+    for (const tag of tagsForChange) {
+      tag.stream.on('data', (chunk) => {
+        tag.content += chunk.toString();
+      });
+
+      tag.stream.on('end', () => {
+        console.log(`Read ${tag.name}.html\n`);
+      });
+    }
+    const lastTag = tagsForChange[tagsForChange.length - 1];
+    lastTag.stream.on('end', () => {
+      input.on('data', (chunk) => {
+        let data = chunk.toString();
+        let newContent = '';
+
+        for (const tag of tagsForChange) {
+          if (data.includes(tag.name)) {
+            newContent = data.replace(`{{${tag.name}}}`, tag.content);
+            data = newContent;
+          }
+          console.log(`Replaced {{${tag.name}}}\n`);
+        }
+        outputContent += newContent;
+      });
+
+      input.on('end', () => {
+        output.write(outputContent);
+      });
+      input.on('end', () => {
+        console.log('index.html filled\n');
+      });
+    });
+  });
+}
+
 cleanUpFiles()
   .catch(({ err1, err2 }) => {
     if (err1 && err1.code === 'ENOENT') {
@@ -105,4 +163,5 @@ cleanUpFiles()
     createDir(projectDirPath, 'assets');
     copyDir(assetsDirPath, projectAssetsDirPath);
     mergeStyles();
+    replaceTags();
   });
