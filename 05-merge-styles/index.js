@@ -3,16 +3,15 @@ const fsPromises = require('fs').promises;
 const path = require('path');
 const styleDirPath = path.join(__dirname, 'styles');
 const bundleDirPath = path.join(__dirname, 'project-dist');
+const bundleName = 'bundle.css';
 
-async function cleanUpBundleFile() {
-  const bundleFilePath = path.join(bundleDirPath, 'bundle.css');
-  await fsPromises
-    .truncate(bundleFilePath)
-    .then(() => console.log('bundle.css successfully cleaned up\n'));
+async function cleanUpFile(path) {
+  await fsPromises.truncate(path);
+  console.log(`${bundleName} successfully cleaned up\n`);
 }
 
-async function readStyleDirectory() {
-  return await fsPromises.readdir(styleDirPath, {
+async function readDir(path) {
+  return await fsPromises.readdir(path, {
     withFileTypes: true,
   });
 }
@@ -39,28 +38,35 @@ function getPathsObject(sourcePath, destPath, sourceFile, destFile) {
   };
 }
 
-function handleStyleFiles() {
-  readStyleDirectory().then((files) => {
-    for (let file of files) {
-      if (!hasExt(file, 'css')) continue;
-      const paths = getPathsObject(
-        styleDirPath,
-        bundleDirPath,
-        file.name,
-        'bundle.css',
-      );
-      writeFile(paths);
-      console.log(`File ${file.name} merged to bundle.css\n`);
-    }
-  });
+async function handleStyleFiles() {
+  const files = await readDir(styleDirPath);
+
+  for (const file of files) {
+    if (!hasExt(file, 'css')) continue;
+    const paths = getPathsObject(
+      styleDirPath,
+      bundleDirPath,
+      file.name,
+      bundleName,
+    );
+
+    writeFile(paths);
+    console.log(`File ${file.name} merged to bundle.css\n`);
+  }
 }
 
-cleanUpBundleFile()
-  .finally(() => handleStyleFiles())
-  .catch((err) => {
-    if (err.code === 'ENOENT') {
-      console.log('bundle.css was not found, cleaning skipped\n');
-    } else {
-      console.err(err);
-    }
-  });
+const bundleFilePath = path.join(bundleDirPath, bundleName);
+
+async function startMerge() {
+  try {
+    await cleanUpFile(bundleFilePath);
+  } catch (err) {
+    err.code === 'ENOENT'
+      ? console.log('File was not found. Cleaning skipped\n')
+      : console.err(err);
+  } finally {
+    await handleStyleFiles();
+  }
+}
+
+startMerge();
