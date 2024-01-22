@@ -30,8 +30,8 @@ function createDir(sourceDir, name) {
   return dirPath;
 }
 
-async function readDirectory(path) {
-  return await fsPromises.readdir(path, {
+function readDirectory(path) {
+  return fsPromises.readdir(path, {
     withFileTypes: true,
   });
 }
@@ -41,7 +41,7 @@ function hasExt(file, ext) {
   return ext === fileExt;
 }
 
-function fillBundleFile(file) {
+function writeFile(file) {
   const input = fs.createReadStream(
     path.join(stylesDirPath, file.name),
     'utf-8',
@@ -55,13 +55,12 @@ function fillBundleFile(file) {
   console.log(`File ${file.name} merged to bundle.css\n`);
 }
 
-function mergeStyles() {
-  readDirectory(stylesDirPath).then((files) => {
-    for (let file of files) {
-      if (!hasExt(file, 'css')) continue;
-      fillBundleFile(file);
-    }
-  });
+async function mergeStyles() {
+  const files = await readDirectory(stylesDirPath);
+  for (let file of files) {
+    if (!hasExt(file, 'css')) continue;
+    writeFile(file);
+  }
 }
 
 function copyFileContent(destinationPath, file) {
