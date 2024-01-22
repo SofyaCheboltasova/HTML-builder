@@ -4,7 +4,6 @@ const path = require('path');
 const projectDirPath = path.join(__dirname, 'project-dist');
 const projectAssetsDirPath = path.join(projectDirPath, 'assets');
 const projectHtmlFilePath = path.join(projectDirPath, 'index.html');
-const stylesFilePath = path.join(projectDirPath, 'style.css');
 const stylesDirPath = path.join(__dirname, 'styles');
 const componentsDirPath = path.join(__dirname, 'components');
 const assetsDirPath = path.join(__dirname, 'assets');
@@ -49,38 +48,31 @@ function hasExt(file, ext) {
   return ext === fileExt;
 }
 
-function writeFile(source, dest, file) {
-  const input = fs.createReadStream(path.join(source, file.name), 'utf-8');
+function writeFile(pathNameData) {
+  const { source, dest } = pathNameData;
+  const ext = path.extname(source).slice(1);
+  const encoding = ext === 'jpg' ? null : 'utf-8';
+
+  const input = fs.createReadStream(source, {
+    encoding: encoding,
+  });
   const output = fs.createWriteStream(dest, {
     flags: 'a',
-    encoding: 'utf-8',
+    encoding: encoding,
   });
 
   input.pipe(output);
-  console.log(`File ${file.name} merged to bundle.css\n`);
 }
 
 async function mergeStyles(source, dest) {
   const files = await readDirectory(source);
   for (let file of files) {
     if (!hasExt(file, 'css')) continue;
-    writeFile(source, dest, file);
+    writeFile({
+      source: path.join(source, file.name),
+      dest: path.join(dest, 'style.css'),
+    });
   }
-}
-
-function copyFileContent(destinationPath, file) {
-  const ext = path.extname(file.name).slice(1);
-  const encoding = ext === 'jpg' ? null : 'utf-8';
-
-  const input = fs.createReadStream(path.join(file.path, file.name), {
-    encoding: encoding,
-  });
-  const output = fs.createWriteStream(path.join(destinationPath, file.name), {
-    flags: 'a',
-    encoding: encoding,
-  });
-
-  input.pipe(output);
 }
 
 function copyDir(sourcePath, destinationPath) {
@@ -92,7 +84,10 @@ function copyDir(sourcePath, destinationPath) {
           const newDestPath = createDir(destinationPath, file.name);
           copyDir(newSourcePath, newDestPath);
         } else {
-          copyFileContent(destinationPath, file);
+          writeFile({
+            source: path.join(sourcePath, file.name),
+            dest: path.join(destinationPath, file.name),
+          });
         }
       }
     })
@@ -163,7 +158,7 @@ cleanUpFiles(projectDirPath)
     createDir(__dirname, 'project-dist');
     createDir(projectDirPath, 'assets');
     copyDir(assetsDirPath, projectAssetsDirPath);
-    mergeStyles(stylesDirPath, stylesFilePath);
+    mergeStyles(stylesDirPath, projectDirPath);
     replaceTags();
   })
   .catch(() => console.log('Nothing to clean\n'));
