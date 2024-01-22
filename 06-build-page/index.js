@@ -9,17 +9,25 @@ const stylesDirPath = path.join(__dirname, 'styles');
 const componentsDirPath = path.join(__dirname, 'components');
 const assetsDirPath = path.join(__dirname, 'assets');
 
-async function cleanUpFiles() {
-  await Promise.allSettled([
-    fsPromises
-      .truncate(projectHtmlFilePath)
-      .then(() => console.log('index.html cleaned up\n')),
-    fsPromises
-      .truncate(stylesFilePath)
-      .then(() => console.log('styles.css cleaned up\n')),
-  ]).then(([err1, err2]) => {
-    throw { err1: err1.reason, err2: err2.reason };
-  });
+async function getAllFiles(source) {
+  const subDirs = await readDirectory(source);
+  const files = await Promise.all(
+    subDirs.map((subDir) => {
+      const elemPath = path.join(source, subDir.name);
+      return subDir.isDirectory() ? getAllFiles(elemPath) : elemPath;
+    }),
+  );
+  return files.flat();
+}
+
+async function cleanUpFiles(source) {
+  const files = await getAllFiles(source);
+
+  await Promise.allSettled(
+    files.map((file) => {
+      return fsPromises.truncate(file);
+    }),
+  ).then(() => console.log('All files cleaned up\n'));
 }
 
 function createDir(sourceDir, name) {
@@ -41,12 +49,9 @@ function hasExt(file, ext) {
   return ext === fileExt;
 }
 
-function writeFile(file) {
-  const input = fs.createReadStream(
-    path.join(stylesDirPath, file.name),
-    'utf-8',
-  );
-  const output = fs.createWriteStream(stylesFilePath, {
+function writeFile(source, dest, file) {
+  const input = fs.createReadStream(path.join(source, file.name), 'utf-8');
+  const output = fs.createWriteStream(dest, {
     flags: 'a',
     encoding: 'utf-8',
   });
@@ -55,11 +60,11 @@ function writeFile(file) {
   console.log(`File ${file.name} merged to bundle.css\n`);
 }
 
-async function mergeStyles() {
-  const files = await readDirectory(stylesDirPath);
+async function mergeStyles(source, dest) {
+  const files = await readDirectory(source);
   for (let file of files) {
     if (!hasExt(file, 'css')) continue;
-    writeFile(file);
+    writeFile(source, dest, file);
   }
 }
 
@@ -71,6 +76,7 @@ function copyFileContent(destinationPath, file) {
     encoding: encoding,
   });
   const output = fs.createWriteStream(path.join(destinationPath, file.name), {
+    flags: 'a',
     encoding: encoding,
   });
 
@@ -152,19 +158,10 @@ function replaceTags() {
   });
 }
 
-cleanUpFiles()
-  .catch(({ err1, err2 }) => {
-    if (err1 && err1.code === 'ENOENT') {
-      console.log('index.html cleaning skipped\n');
-    }
-    if (err2 && err2.code === 'ENOENT') {
-      console.log('styles.css cleaning skipped\n');
-    }
-  })
-  .finally(() => {
-    createDir(__dirname, 'project-dist');
-    createDir(projectDirPath, 'assets');
-    copyDir(assetsDirPath, projectAssetsDirPath);
-    mergeStyles();
-    replaceTags();
-  });
+cleanUpFiles(projectDirPath).then(() => {
+  createDir(__dirname, 'project-dist');
+  createDir(projectDirPath, 'assets');
+  copyDir(assetsDirPath, projectAssetsDirPath);
+  mergeStyles(stylesDirPath, stylesFilePath);
+  replaceTags();
+});
