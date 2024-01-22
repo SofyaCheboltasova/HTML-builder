@@ -1,6 +1,7 @@
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
+
 const projectDirPath = path.join(__dirname, 'project-dist');
 const projectAssetsDirPath = path.join(projectDirPath, 'assets');
 const projectHtmlFilePath = path.join(projectDirPath, 'index.html');
@@ -27,7 +28,8 @@ async function cleanUpFiles(source) {
     files.map((file) => {
       return fsPromises.truncate(file);
     }),
-  ).then(() => console.log('All files cleaned up\n'));
+  );
+  console.log('All files cleaned up\n');
 }
 
 function createDir(source, name) {
@@ -93,8 +95,10 @@ function getPathsObject(sourcePath, destPath, sourceFile, destFile) {
 
 async function mergeStyles(source, dest) {
   const files = await readDir(source);
+
   for (const file of files) {
     if (!hasExt(file, 'css')) continue;
+
     const paths = getPathsObject(source, dest, file.name, 'style.css');
     writeFile(paths);
   }
@@ -117,6 +121,7 @@ function readTagContent(tag) {
 
 function replaceTags(chunk, tagsForChange) {
   let newContent = '';
+
   for (const tag of tagsForChange) {
     if (chunk.includes(tag.name)) {
       newContent = chunk.replace(`{{${tag.name}}}`, tag.content);
@@ -159,12 +164,18 @@ async function handleHtmlFile(source, dest) {
   });
 }
 
-cleanUpFiles(projectDirPath)
-  .finally(() => {
+async function startBuld() {
+  try {
+    await cleanUpFiles(projectDirPath);
+  } catch {
+    console.log('Nothing to clean\n');
+  } finally {
     createDir(__dirname, 'project-dist');
     createDir(projectDirPath, 'assets');
-    copyDir(assetsDirPath, projectAssetsDirPath);
-    mergeStyles(stylesDirPath, projectDirPath);
-    handleHtmlFile(templateFilePath, projectHtmlFilePath);
-  })
-  .catch(() => console.log('Nothing to clean\n'));
+    await copyDir(assetsDirPath, projectAssetsDirPath);
+    await mergeStyles(stylesDirPath, projectDirPath);
+    await handleHtmlFile(templateFilePath, projectHtmlFilePath);
+  }
+}
+
+startBuld();
