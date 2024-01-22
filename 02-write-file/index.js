@@ -1,11 +1,11 @@
 const { stdin, stdout } = process;
 const fs = require('fs');
 const path = require('path');
-const pathToFile = path.join(__dirname, 'output.txt');
+const pathToFile = path.join(__dirname, '02-write-file.txt');
 const output = fs.createWriteStream(pathToFile);
 
 function exitProgram(signal) {
-  stdout.write(`The program was stopped with signal ${signal}`);
+  stdout.write(`The program was stopped with signal ${signal}\nBye!\n`);
   output.end();
 }
 
