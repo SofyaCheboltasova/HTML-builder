@@ -29,8 +29,8 @@ async function cleanUpFiles(source) {
   ).then(() => console.log('All files cleaned up\n'));
 }
 
-function createDir(sourceDir, name) {
-  const dirPath = path.join(sourceDir, name);
+function createDir(source, name) {
+  const dirPath = path.join(source, name);
   fs.mkdir(dirPath, { recursive: true }, () => {
     console.log(`${name} directory created\n`);
   });
@@ -48,8 +48,9 @@ function hasExt(file, ext) {
   return ext === fileExt;
 }
 
-function writeFile(pathNameData) {
-  const { source, dest } = pathNameData;
+function writeFile(paths) {
+  const { source, dest } = paths;
+
   const ext = path.extname(source).slice(1);
   const encoding = ext === 'jpg' ? null : 'utf-8';
 
@@ -64,30 +65,33 @@ function writeFile(pathNameData) {
   input.pipe(output);
 }
 
+function getPathsObject(sourcePath, destPath, sourceFile, destFile) {
+  return {
+    source: path.join(sourcePath, sourceFile),
+    dest: path.join(destPath, destFile),
+  };
+}
+
 async function mergeStyles(source, dest) {
   const files = await readDirectory(source);
-  for (let file of files) {
+  for (const file of files) {
     if (!hasExt(file, 'css')) continue;
-    writeFile({
-      source: path.join(source, file.name),
-      dest: path.join(dest, 'style.css'),
-    });
+    const paths = getPathsObject(source, dest, file.name, 'style.css');
+    writeFile(paths);
   }
 }
 
-function copyDir(sourcePath, destinationPath) {
-  readDirectory(sourcePath)
+function copyDir(source, dest) {
+  readDirectory(source)
     .then((files) => {
       for (const file of files) {
         if (file.isDirectory()) {
           const newSourcePath = path.join(file.path, file.name);
-          const newDestPath = createDir(destinationPath, file.name);
+          const newDestPath = createDir(dest, file.name);
           copyDir(newSourcePath, newDestPath);
         } else {
-          writeFile({
-            source: path.join(sourcePath, file.name),
-            dest: path.join(destinationPath, file.name),
-          });
+          const paths = getPathsObject(source, dest, file.name, file.name);
+          writeFile(paths);
         }
       }
     })
