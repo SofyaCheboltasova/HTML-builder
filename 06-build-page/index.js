@@ -10,9 +10,9 @@ const assetsDirPath = path.join(__dirname, 'assets');
 const templateFilePath = path.join(__dirname, 'template.html');
 
 async function getAllFiles(source) {
-  const subDirs = await readDirectory(source);
+  const subDirs = await readDir(source);
   const files = await Promise.all(
-    subDirs.map(async (subDir) => {
+    subDirs.map((subDir) => {
       const elemPath = path.join(source, subDir.name);
       return subDir.isDirectory() ? getAllFiles(elemPath) : elemPath;
     }),
@@ -38,10 +38,28 @@ function createDir(source, name) {
   return dirPath;
 }
 
-function readDirectory(path) {
+function readDir(path) {
   return fsPromises.readdir(path, {
     withFileTypes: true,
   });
+}
+
+async function copyDir(source, dest) {
+  const files = await readDir(source);
+
+  for (const file of files) {
+    const fname = file.name;
+    const fpath = file.path;
+
+    if (file.isDirectory()) {
+      const newSourcePath = path.join(fpath, fname);
+      const newDestPath = createDir(dest, fname);
+      copyDir(newSourcePath, newDestPath);
+    } else {
+      const paths = getPathsObject(source, dest, fname, fname);
+      writeFile(paths);
+    }
+  }
 }
 
 function hasExt(file, ext) {
@@ -74,29 +92,11 @@ function getPathsObject(sourcePath, destPath, sourceFile, destFile) {
 }
 
 async function mergeStyles(source, dest) {
-  const files = await readDirectory(source);
+  const files = await readDir(source);
   for (const file of files) {
     if (!hasExt(file, 'css')) continue;
     const paths = getPathsObject(source, dest, file.name, 'style.css');
     writeFile(paths);
-  }
-}
-
-async function copyDir(source, dest) {
-  const files = await readDirectory(source);
-
-  for (const file of files) {
-    const fname = file.name;
-    const fpath = file.path;
-
-    if (file.isDirectory()) {
-      const newSourcePath = path.join(fpath, fname);
-      const newDestPath = createDir(dest, fname);
-      copyDir(newSourcePath, newDestPath);
-    } else {
-      const paths = getPathsObject(source, dest, fname, fname);
-      writeFile(paths);
-    }
   }
 }
 
@@ -127,12 +127,12 @@ function replaceTags(chunk, tagsForChange) {
   return chunk;
 }
 
-async function handleHtmlFile() {
-  const input = fs.createReadStream(templateFilePath, 'utf-8');
-  const output = fs.createWriteStream(projectHtmlFilePath, 'utf-8');
+async function handleHtmlFile(source, dest) {
+  const input = fs.createReadStream(source, 'utf-8');
+  const output = fs.createWriteStream(dest, 'utf-8');
   const tagsForChange = [];
 
-  const files = await readDirectory(componentsDirPath);
+  const files = await readDir(componentsDirPath);
   for (const file of files) {
     if (hasExt(file, 'html')) {
       const tagData = setTagData(file.name);
@@ -165,6 +165,6 @@ cleanUpFiles(projectDirPath)
     createDir(projectDirPath, 'assets');
     copyDir(assetsDirPath, projectAssetsDirPath);
     mergeStyles(stylesDirPath, projectDirPath);
-    handleHtmlFile();
+    handleHtmlFile(templateFilePath, projectHtmlFilePath);
   })
   .catch(() => console.log('Nothing to clean\n'));
