@@ -19,9 +19,9 @@ function removeDirectories(content) {
 }
 
 function printFileInfo(file) {
-  const name = file.name;
-  const ext = path.extname(name).slice(1);
-  const filePath = path.join(secretFolderPath, name);
+  const ext = path.extname(file.name).slice(1);
+  const name = file.name.replace(`.${ext}`, '');
+  const filePath = path.join(secretFolderPath, file.name);
 
   fsPromises.stat(filePath).then((stat) => {
     const size = stat.size;
